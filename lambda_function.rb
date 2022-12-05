@@ -2,10 +2,6 @@ require 'net/http'
 require 'json'
 require 'twitter'
 
-# top left Myrtle/Throop 40.69621, -73.94377
-# bottom right Putnam/Broadway 40.68757, -73.91875
-# stations = res['data']['stations'].select { |st| st['lat'] <= 40.69621 && st['lat'] >= 40.68757 && st['lon'] <= -73.91875 && st['lon'] >= -73.94377 }
-
 # westernmost Willoughby and Wsh Park -73.97378173414944
 # easternmost Forest & Summerfield -73.89771454982606
 # southernmost Sterling St & Bedford 40.66254075631774
@@ -15,6 +11,7 @@ require 'twitter'
 def lambda_handler(event:, context:)
   # bust stations cache between tweets but reuse rather than rerunning the select for each call to #stations
   @stations = nil
+  @renting_stations = nil
 
   latest_tweet = tweet
   { statusCode: 200, body: JSON.generate("Posted Tweet ID #{latest_tweet.id} at #{latest_tweet.created_at}") }
@@ -44,9 +41,7 @@ end
 
 # every station in the entire CitiBike system
 def all_stations
-  if @all_stations.nil?
-    @all_stations = JSON.parse(Net::HTTP.get(URI("https://gbfs.citibikenyc.com/gbfs/en/station_status.json")))
-  elsif Time.now.to_i - @all_stations["last_updated"] > 120
+  if @all_stations.nil? || Time.now.to_i - @all_stations["last_updated"] > 120
     @all_stations = JSON.parse(Net::HTTP.get(URI("https://gbfs.citibikenyc.com/gbfs/en/station_status.json")))      
   end
 
@@ -60,7 +55,7 @@ def stations
 end
 
 def renting_stations
-  stations.select do |station|
+  @renting_stations ||= stations.select do |station|
     station['is_renting'] == 1
   end
 end

@@ -13,8 +13,11 @@ require 'twitter'
 
 
 def lambda_handler(event:, context:)
-    latest_tweet = tweet
-    { statusCode: 200, body: JSON.generate("Posted Tweet ID #{latest_tweet.id} at #{latest_tweet.created_at}") }
+  # bust stations cache between tweets but reuse rather than rerunning the select for each call to #stations
+  @stations = nil
+
+  latest_tweet = tweet
+  { statusCode: 200, body: JSON.generate("Posted Tweet ID #{latest_tweet.id} at #{latest_tweet.created_at}") }
 end
 
 def tweet
@@ -44,14 +47,14 @@ def all_stations
   if @all_stations.nil?
     @all_stations = JSON.parse(Net::HTTP.get(URI("https://gbfs.citibikenyc.com/gbfs/en/station_status.json")))
   elsif Time.now.to_i - @all_stations["last_updated"] > 120
-      @all_stations = JSON.parse(Net::HTTP.get(URI("https://gbfs.citibikenyc.com/gbfs/en/station_status.json")))      
+    @all_stations = JSON.parse(Net::HTTP.get(URI("https://gbfs.citibikenyc.com/gbfs/en/station_status.json")))      
   end
 
   @all_stations
 end
 
 def stations
-  all_stations['data']['stations'].select do |station|
+  @stations ||= all_stations['data']['stations'].select do |station|
     station_ids.include? station['station_id']
   end
 end
